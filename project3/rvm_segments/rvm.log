@@ -1,0 +1,10 @@
+trans_start
+0
+2
+testseg1
+10
+hello, world
+testseg2
+100
+hello, world
+trans_end

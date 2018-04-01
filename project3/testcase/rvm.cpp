@@ -349,7 +349,4 @@ void rvm_abort_trans(trans_t trans_id){
 	}
 }
 
-void rvm_unmap(rvm_t rvm, void *segbase){
-	print_str("Unmapping segment \n" , verbose);
-}
 
