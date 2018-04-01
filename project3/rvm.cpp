@@ -29,6 +29,9 @@ static std::map<void*, segment_t *> map_pt_to_seg;
 //map mod regions to their transactions
 static map<trans_t, list<region_header_t *> *> map_trans_to_regions;
 
+//incremental trans_id
+trans_t trans_ids = 0;
+
 int verbose = 1;
 
 void print_str(string data , int flag){
@@ -163,7 +166,7 @@ void rvm_truncate_log(rvm_t rvm){
 				list.push_back(line);
 			}
 		}else{
-			 cout << "Unable to open log file";
+			 print_str("Unable to open log file \n" , verbose);
 		}
 
 		//check	last line in file is trans_end
@@ -236,7 +239,7 @@ trans_t rvm_begin_trans(rvm_t rvm , int numsegs , void **segbases){
 		}	
 	}		
 	//Generate random trans_id	
-	trans_t trans_id = rand() % 1000 + 1;
+	trans_t trans_id = trans_ids++;
 	
 	//pass trans_id to all segments to garantee that no other transaction is going to access it
 	for (int i=0; i< numsegs; i++) {
@@ -251,9 +254,11 @@ trans_t rvm_begin_trans(rvm_t rvm , int numsegs , void **segbases){
 
 void rvm_about_to_modify(trans_t trans_id , void *segbase , int offset, int size){
 	
+	string report = "rvm_about_to_modify(): transaction id = " + to_string(trans_id) + "\n";
+	print_str(report , verbose);			
+	
 	//iterator for trans maps	
 	map<trans_t, list<region_header_t *> *>::iterator trans_it;
-		
 	map<void *, segment_t *>::iterator it;	
 	it = map_pt_to_seg.find(segbase);
 	//check if trans owns seg and if seg is mapped	
@@ -276,10 +281,10 @@ void rvm_about_to_modify(trans_t trans_id , void *segbase , int offset, int size
 			regions->push_back(region);
 			
 			map_trans_to_regions.insert(pair<trans_t , list<region_header_t*> *>(trans_id, regions));
-			print_str("Trans not Mapped \n" , verbose);
+			print_str("rvm_about_to_modify: trans not Mapped \n" , verbose);
 		}else{
 			trans_it->second->push_back(region);
-			print_str("Trans mapped \n" , verbose);	
+			print_str("rvm_about_to_modify: trans mapped \n" , verbose);	
 		}	
 	}else{
 		print_str("region not mapped, or already being modified \n" , verbose);	
@@ -294,6 +299,7 @@ void rvm_commit_trans(trans_t trans_id){
 	trans_it = map_trans_to_regions.find(trans_id);
 	
 	ofstream log(log_file);
+	print_str("Committing transaction \n" , verbose);	
 	log<<"trans_start"<<endl;
 	log<<trans_id<<endl;
 	log<<trans_it->second->size()<<endl;	
@@ -302,23 +308,23 @@ void rvm_commit_trans(trans_t trans_id){
 		
 		char buff[256];
 		memset(buff , 0 , 256);
-		strncpy (buff, (char *)(*it)->segment->load , (*it)->size +1);
+		strncpy (buff, (char *)(*it)->segment->load + (*it)->offset, (*it)->size +1);
 		strncpy ((char *)(*it)->segment->load_backup, (char *)(*it)->segment->load , (*it)->size +1);
 		log << (*it)->segment->name<<endl;
 		log << (*it)->offset<<endl;
 		log << buff <<endl;
+		cout<<"Seg data " << buff <<endl;
 		(*it)->segment->trans_id = -1;
 		free(*it);
 	}
-
-
+	delete map_trans_to_regions[trans_id];
+	
+	map_trans_to_regions.erase(trans_id);
+	
+	print_str("Done committing transaction \n" , verbose);	
 	log<<"trans_end"<<endl;	
 	log.close();	
 
-	/*
-	for(std::map<trans_t , region_header_t *>::iterator it = map_trans_to_regions.begin(); it!=map_trans_to_region.end(); it++){
-		cout<<"workinnnnnnnnnnnn \n";
-	};*/	
 		
 }
 
@@ -329,20 +335,21 @@ void rvm_abort_trans(trans_t trans_id){
 	for(std::list<region_header_t *>::iterator it = trans_it->second->begin(); it!=trans_it->second->end(); it++){
 		strncpy((char *)(*it)->segment->load + (*it)->offset, (char *)(*it)->segment->load_backup, (*it)->segment->size +1);
 		/*
-		char buff[256];
-		memset(buff , 0, 256);
-		strncpy (buff + 100, (char *)(*it)->segment->load , 12);
+		char buff[1000];
+		memset(buff , 0, 1000);
+		strncpy (buff , (char *)(*it)->segment->load, (*it)->segment->size);
+		cout<<"buff val "<<buff<<endl;
 		//cout << (*it)->segment->name<<endl;
 		//log << (*it)->offset<<endl;
 		//cout << buff <<endl;
-		ofstream log("test.txt");
-		log<< (char *)(*it)->segment->load;
-		log.close();*/
+		//ofstream log("test.txt");
+		//log<< (char *)(*it)->segment->load;
+		//log.close();
+		*/
 	}
 }
 
 #include <sys/wait.h>
-
 
 #define SEGNAME0  "testseg1"
 #define SEGNAME1  "testseg2"
