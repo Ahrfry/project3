@@ -93,17 +93,18 @@ void *rvm_map(rvm_t rvm , const char *segname , int size_to_create){
 		//std::cout<<path_to_segment<<std::endl;	
 		
 		struct stat sb;
-		if((stat(segname, &sb) == 0)){
-			print_str("File exists \n" , -1);
+		if((stat(path_to_segment, &sb) == 0)){
+			print_str("File exists \n" , verbose);
 			if(sb.st_size != size_to_create){
 				truncate(path_to_segment , size_to_create);
 			}
 			
+			rvm_truncate_log(rvm);
+			
 			FILE *fp = fopen(path_to_segment, "r");
 			fread(segment->load, 1, size_to_create, fp);
 			fread(segment->load_backup, 1, size_to_create, fp);
-			
-			rvm_truncate_log(rvm);
+					
 		}else{
 			FILE *fp = fopen(path_to_segment, "w");
 			fclose(fp);
@@ -117,6 +118,7 @@ void *rvm_map(rvm_t rvm , const char *segname , int size_to_create){
 		print_str(str , 1);
 		return NULL;
 	}
+
 	//map name to segment
 	mapsegname.insert(pair<std::string,segment_t *>(std::string(segname),segment));
 	//map pointer to segment
@@ -126,6 +128,18 @@ void *rvm_map(rvm_t rvm , const char *segname , int size_to_create){
 	
 }
 
+streampos file_size( const char* file_path ){
+
+    std::streampos fsize = 0;
+    std::ifstream file( file_path, std::ios::binary );
+
+    fsize = file.tellg();
+    file.seekg( 0, std::ios::end );
+    fsize = file.tellg() - fsize;
+    file.close();
+
+    return fsize;
+}
 
 void rvm_truncate_log(rvm_t rvm){
 	
@@ -138,56 +152,57 @@ void rvm_truncate_log(rvm_t rvm){
 	//construct path to log file
 	strcat(log, rvm.dir);
         strcat(log,"/rvm.log");
-	
-	//open log file for reading
-	ifstream myfile (log);
-	
-	if (myfile.is_open())
-  	{
-    		//push line by line into list
-		while ( getline (myfile,line) ){
-      			list.push_back(line);
-    		}
-  	}else{
-		 cout << "Unable to open log file";
-	}
-
-	//check	last line in file is trans_end
-	string trans_end = list.at(list.size() -1 );
-	if(trans_end.compare("trans_end") == 0){
-		//cout<<"Strings are equal"<<endl;
-		int num_segs = stoi(list.at(2));
-		int j = 3;
-		for(int i = 0; i < num_segs; i++){	
-			
-			int offset = stoi(list.at(j+1));
-			int data_size = list.at(j+2).length();
-			
-			char file_path[256];
-			memset(file_path, 0, 256);
-			strcat(file_path, rvm.dir);
-			strcat(file_path, "/");
-			strcat(file_path , list.at(j).c_str());
-			cout<<file_path <<endl;
-			FILE *seg_file = fopen(file_path,"r+");
-			//set the offset
-			fseek(seg_file, offset , SEEK_SET);
-			//write data to file
-			fwrite(list.at(j+2).c_str(), 1, data_size , seg_file);
-			fflush(seg_file);
-			fclose(seg_file);
-			j = j + 3;
-		}
+	if(file_size(log) > 0){	
+		//open log file for reading
+		ifstream myfile (log);
 		
+		if (myfile.is_open())
+		{
+			//push line by line into list
+			while ( getline (myfile,line) ){
+				list.push_back(line);
+			}
+		}else{
+			 cout << "Unable to open log file";
+		}
 
-	}else{
-		print_str("Transaction aborted before full commit" , 1);
+		//check	last line in file is trans_end
+		string trans_end = list.at(list.size() -1 );
+		if(trans_end.compare("trans_end") == 0){
+			//cout<<"Strings are equal"<<endl;
+			int num_segs = stoi(list.at(2));
+			int j = 3;
+			for(int i = 0; i < num_segs; i++){	
+				
+				int offset = stoi(list.at(j+1));
+				int data_size = list.at(j+2).length();
+				
+				char file_path[256];
+				memset(file_path, 0, 256);
+				strcat(file_path, rvm.dir);
+				strcat(file_path, "/");
+				strcat(file_path , list.at(j).c_str());
+				cout<<file_path <<endl;
+				FILE *seg_file = fopen(file_path,"r+");
+				//set the offset
+				fseek(seg_file, offset , SEEK_SET);
+				//write data to file
+				fwrite(list.at(j+2).c_str(), 1, data_size , seg_file);
+				fflush(seg_file);
+				fclose(seg_file);
+				j = j + 3;
+			}
+			
+
+		}else{
+			print_str("Transaction aborted before full commit" , 1);
+		}
+		cout<<log<<endl;
+
+		print_str(log , verbose);		
+		print_str("\n" , verbose);
+		myfile.close();
 	}
-	cout<<log<<endl;
-
-	print_str(log , verbose);		
-    	print_str("\n" , verbose);
-	myfile.close();
 	FILE* lfp = fopen(log, "w");
 	fclose(lfp);
 }
@@ -227,6 +242,7 @@ trans_t rvm_begin_trans(rvm_t rvm , int numsegs , void **segbases){
 	for (int i=0; i< numsegs; i++) {
 		it = map_pt_to_seg.find(segbases[i]);
 		it->second->trans_id = trans_id;
+		strncpy ((char *) it->second->load_backup, (char *) it->second->load , (int)it->second->size);
 	}
 
 	return trans_id;
@@ -252,6 +268,7 @@ void rvm_about_to_modify(trans_t trans_id , void *segbase , int offset, int size
 		region->load_mod = (char *)malloc(size);
 		region->segment = it->second;
 		memset(region->load_mod , 0 , size);
+		memcpy(region->load_mod, (char*)segbase+offset, size);	
 		//see if trans is already mapped
 	       	trans_it = map_trans_to_regions.find(trans_id);
 		if(trans_it == map_trans_to_regions.end()){
@@ -282,13 +299,19 @@ void rvm_commit_trans(trans_t trans_id){
 	log<<trans_it->second->size()<<endl;	
 	
 	for(std::list<region_header_t *>::iterator it = trans_it->second->begin(); it!=trans_it->second->end(); it++){
-		char buff[256];
 		
+		char buff[256];
+		memset(buff , 0 , 256);
 		strncpy (buff, (char *)(*it)->segment->load , (*it)->size +1);
+		strncpy ((char *)(*it)->segment->load_backup, (char *)(*it)->segment->load , (*it)->size +1);
 		log << (*it)->segment->name<<endl;
 		log << (*it)->offset<<endl;
 		log << buff <<endl;
+		(*it)->segment->trans_id = -1;
+		free(*it);
 	}
+
+
 	log<<"trans_end"<<endl;	
 	log.close();	
 
@@ -299,65 +322,92 @@ void rvm_commit_trans(trans_t trans_id){
 		
 }
 
+void rvm_abort_trans(trans_t trans_id){
+	//Need to set all segment->trans_id to -1 
+	map<trans_t, list<region_header_t *> *>::iterator trans_it;
+	trans_it = map_trans_to_regions.find(trans_id);
+	for(std::list<region_header_t *>::iterator it = trans_it->second->begin(); it!=trans_it->second->end(); it++){
+		strncpy((char *)(*it)->segment->load + (*it)->offset, (char *)(*it)->segment->load_backup, (*it)->segment->size +1);
+		/*
+		char buff[256];
+		memset(buff , 0, 256);
+		strncpy (buff + 100, (char *)(*it)->segment->load , 12);
+		//cout << (*it)->segment->name<<endl;
+		//log << (*it)->offset<<endl;
+		//cout << buff <<endl;
+		ofstream log("test.txt");
+		log<< (char *)(*it)->segment->load;
+		log.close();*/
+	}
+}
+
 #include <sys/wait.h>
 
-#define TEST_STRING "hello, world"
-#define OFFSET2 1000
+
+#define SEGNAME0  "testseg1"
+#define SEGNAME1  "testseg2"
+
+#define OFFSET0  10
+#define OFFSET1  100
+
+#define STRING0 "hello, world"
+#define STRING1 "black agagadrof!"
 
 
-/* proc1 writes some data, commits it, then exits */
 void proc1() 
 {
      rvm_t rvm;
+     char* segs[2];
      trans_t trans;
-     char* segs[1];
      
      rvm = rvm_init("rvm_segments");
-     rvm_destroy(rvm, "testseg");
-     segs[0] = (char *) rvm_map(rvm, "testseg", 10000);
 
-     
-     trans = rvm_begin_trans(rvm, 1, (void **) segs);
-     
-     rvm_about_to_modify(trans, segs[0], 0, 100);
-     sprintf(segs[0], TEST_STRING);
-     
-     rvm_about_to_modify(trans, segs[0], OFFSET2, 100);
-     sprintf(segs[0]+OFFSET2, TEST_STRING);
-     
+     rvm_destroy(rvm, SEGNAME0);
+     rvm_destroy(rvm, SEGNAME1);
+
+     segs[0] = (char*) rvm_map(rvm, SEGNAME0, 1000);
+     segs[1] = (char*) rvm_map(rvm, SEGNAME1, 1000);
+
+     trans = rvm_begin_trans(rvm, 2, (void **)segs);
+
+     rvm_about_to_modify(trans, segs[0], OFFSET0, 100);
+     strcpy(segs[0]+OFFSET0, STRING0);
+     rvm_about_to_modify(trans, segs[1], OFFSET1, 100);
+     strcpy(segs[1]+OFFSET1, STRING1);
+
      rvm_commit_trans(trans);
-	rvm_truncate_log(rvm);
-     //abort();
+
+     abort();
 }
 
 
-/* proc2 opens the segments and reads from them */
 void proc2() 
 {
-     char* segs[1];
      rvm_t rvm;
-     
-     rvm = rvm_init("rvm_segments");
+     char *segs[2];
 
-     segs[0] = (char *) rvm_map(rvm, "testseg", 10000);
-     if(strcmp(segs[0], TEST_STRING)) {
-	  printf("ERROR: first hello not present\n");
+     rvm = rvm_init("rvm_segments");
+     segs[0] = (char*) rvm_map(rvm, SEGNAME0, 1000);
+     segs[1] = (char*) rvm_map(rvm, SEGNAME1, 1000);
+
+     if(strcmp(segs[0] + OFFSET0, STRING0)) {
+	  printf("ERROR in segment 0 (%s)\n",
+		 segs[0]+OFFSET0);
 	  exit(2);
      }
-     if(strcmp(segs[0]+OFFSET2, TEST_STRING)) {
-	  printf("ERROR: second hello not present\n");
+     if(strcmp(segs[1] + OFFSET1, STRING1)) {
+	  printf("ERROR in segment 1 (%s)\n",
+		 segs[1]+OFFSET1);
 	  exit(2);
      }
 
      printf("OK\n");
-     exit(0);
 }
 
 
-int main(){
-	proc1();
-	/*
-	int pid;
+int main(int argc, char **argv) 
+{
+     int pid;
 
      pid = fork();
      if(pid < 0) {
@@ -372,35 +422,6 @@ int main(){
      waitpid(pid, NULL, 0);
 
      proc2();
-	*/	
-	/*	
-	rvm_t rvm;
-     	trans_t trans;
-     	char* segs[1];
-     
-     	rvm = rvm_init("rvm_segments");
-     	rvm_destroy(rvm, "testseg");
-     	segs[0] = (char *) rvm_map(rvm, "testseg", 10000);
 
-     	
-	trans = rvm_begin_trans(rvm, 1, (void **) segs);	
-	
-		rvm_about_to_modify(trans , segs[0] , 10, 11);
-	
-		sprintf(segs[0], "TEST_STRING");
-	
-		rvm_about_to_modify(trans , segs[0] , 30, 11);
-	
-		sprintf(segs[0] + 30 , "TEST_STRING");	
-	
-	rvm_commit_trans(trans);
-	
-	rvm_truncate_log(rvm);	
-	*/
-		
-	return 0;
-
-
-
-
+     return 0;
 }
