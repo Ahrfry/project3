@@ -1,10 +1,10 @@
 trans_start
-0
+1
 2
-testseg1
-10
-hello, world
-testseg2
-100
-hello, world
+testseg
+0
+bleg!
+testseg
+1000
+bleg!
 trans_end

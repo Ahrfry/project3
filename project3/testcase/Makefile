@@ -16,4 +16,4 @@ truncate:
 
 
 clean:
-	rm -rf *.o basic multi abort multi-abort truncate
+	rm -rf *.o basic multi abort multi-abort truncate test_map

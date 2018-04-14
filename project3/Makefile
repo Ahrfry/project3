@@ -1,5 +1,3 @@
-#### RVM Library Makefile
-
 CFLAGS  = -Wall -g -I.
 LFLAGS  =
 CC      = g++
@@ -22,9 +20,7 @@ $(LIBRARY): $(LIB_OBJ)
 
 
 
-TESTCASESDIR=.
-
-all: basic multi abort multi-abort truncate
+all: basic abort  multi-abort multi truncate test_map abort_then_commit
 basic: 
 	        $(CC) $(OPTIONS) -o basic testcase/basic.c librvm.a
 
@@ -40,12 +36,16 @@ multi-abort:
 truncate: 
 	        $(CC) $(OPTIONS) -o truncate testcase/truncate.c librvm.a
 
+test_map: 
+	        $(CC) $(OPTIONS) -o test_map testcase/test_map.c librvm.a
 
+abort_then_commit: 
+	        $(CC) $(OPTIONS) -o abort_then_commit testcase/abort_then_commit.c librvm.a
 
 
 
 
 clean:
-	        rm -rf *.o basic multi abort multi-abort truncate
+	        rm -rf *.o multi abort multi-abort truncate basic test_map abort_then_commit
 
 

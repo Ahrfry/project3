@@ -83,7 +83,7 @@ void *rvm_map(rvm_t rvm , const char *segname , int size_to_create){
 	//check if segname is already mapped
 	if ( mapsegname.find(seg_name_str) == mapsegname.end() ) {
 		print_str("seg not found \n" , 1);
-		
+		print_str("Mapping " + seg_name_str + " \n" , verbose);	
 		//create segment structure
 		segment->name = segname;
 		segment->size = size_to_create;
@@ -292,7 +292,7 @@ void rvm_about_to_modify(trans_t trans_id , void *segbase , int offset, int size
 			print_str("rvm_about_to_modify: trans mapped \n" , verbose);	
 		}	
 	}else{
-		print_str("region not mapped, or already being modified \n" , verbose);	
+		print_str("rvm_about_to_modify(): Region not mapped, or already being modified \n" , verbose);	
 	}
 
 
@@ -336,6 +336,8 @@ void rvm_abort_trans(trans_t trans_id){
 	map<trans_t, list<region_header_t *> *>::iterator trans_it;
 	trans_it = map_trans_to_regions.find(trans_id);
 	for(std::list<region_header_t *>::iterator it = trans_it->second->begin(); it!=trans_it->second->end(); it++){
+		//Free segment from transaction
+		(*it)->segment->trans_id = -1;
 		strncpy((char *)(*it)->segment->load + (*it)->offset, (char *)(*it)->segment->load_backup, (*it)->segment->size +1);
 		char buff[1000];
 		memset(buff , 0, 1000);
@@ -351,5 +353,16 @@ void rvm_abort_trans(trans_t trans_id){
 
 void rvm_unmap(rvm_t rvm, void *segbase){
 	print_str("Unmapping segment \n" , verbose);
+	//create iterator for segment
+	map<void * , segment_t *>::iterator it;
+	it = map_pt_to_seg.find(segbase);
+	//if segment exists we need to unmap it from map_pt and mapsegname
+	if(it != map_pt_to_seg.end()){
+		//erase it from map
+		mapsegname.erase(string(it->second->name));
+		//erase pointer
+		map_pt_to_seg.erase(segbase);	
+		
+	}
 }
 
