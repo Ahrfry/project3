@@ -10,9 +10,21 @@
 #include <netdb.h> 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <pthread.h>
+#include <string>
+#include <list>
+#include <vector>
+#include <iostream>
+#include <fstream>
 
 #define QUERRY 1
 #define NUM_NODES 5
+
+
+//map mod regions to their transactions
+static map<trans_t, list<region_header_t *> *> map_trans_to_regions;
+
+
 
 void error(const char *msg)
 {
@@ -54,7 +66,6 @@ void *connection_handler(void *socket)
 	int req;
 	req =  buffer[0] -'0';	
 	
-	printf("REQ %d \n" , req);
 		
 	//if service request type is QUERRY	
 	if(req == QUERRY){
