@@ -120,39 +120,23 @@ void finalize(env_t *env){
 
 
 void *client_thread(void *args){
-	env_t *env = (env_t *)malloc(sizeof(env_t));	
-	bzero(env->key , strlen(env->key));
-	
-	strcpy(env->key , "smith");
-	for(int i=0; i<100; i++){
-		init_session(env);
-		for(int i=0; i<5; i++){
-			put(env , "smith" , ",soap");
-		}
-		sleep(1);
-		get(env , "smith");
-		finalize(env);
-	}
+
 }
 
 int main()
 {
-	
-
-	pthread_t p_arr[5];
-	void *dummy;
-	for(int i=0; i<5; i++){
-		//create 5 threads
-		pthread_t p;
-		if(i%2 == 0){
-			pthread_create(&p, NULL, client_thread, dummy);
+	env_t *env = (env_t *)malloc(sizeof(env_t));	
+	bzero(env->key , strlen(env->key));
+	strcpy(env->key , "smith");
+	init_session(env);
+	for(int i=0; i<1000; i++){
+		for(int i=0; i<5; i++){
+			put(env , "smith" , ",soap");
 		}
-		p_arr[i] = p;
+		//sleep(1);
+		get(env , "smith");
+		finalize(env);
 	}
-	for(int i=0; i<5; i++){
-		pthread_join(p_arr[i], NULL);
-	}
-		
 	//strcpy(buffer , "2smith,soap");
 	//send_message(buffer , 2004);
 	return 0;

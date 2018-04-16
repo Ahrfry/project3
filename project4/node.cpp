@@ -9,6 +9,28 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <pthread.h>
+#include <string>
+#include <list>
+#include <vector>
+#include <iostream>
+#include <fstream>
+#include <map>
+
+#define QUERRY 1
+#define PUT 2
+#define GET 3
+#define FINALIZE 4
+#define NUM_NODES 5
+
+
+using namespace std;
+
+//map key to values
+static map<string, list<string>> map_user_to_cart;
+
+
+//replicas <por_number , <map<key,list<values>>
+//static map<int , map<string , list<string>> replicas;
 
 #define QUERRY 1
 #define NUM_NODES 5
@@ -28,10 +50,88 @@ int query(char buff[]){
 	return value % NUM_NODES;
 }
 
+char *get(char buff[]){
+	
+	char key[20];
+	bzero(key , 20);
+	strncpy(key , buff , strlen(buff));
+	
+	string key_str = key + 1;
+	string temp_load = "";
+	int flag = 0;
+	char *load;	
+	map<string, list<string>>::iterator it;
+	it = map_user_to_cart.find(key_str);
+	if(it != map_user_to_cart.end()){
+		flag = 1;
+		for(list<string>::iterator list_it = it->second.begin(); list_it!=it->second.end(); list_it++){
+			temp_load = temp_load + " " + *list_it;
+		}
+	}
+	bzero(buff , strlen(buff));
+	strcpy(buff , temp_load.c_str());
+	load = buff;	
+	//printf("key: %s value: %s \n" , key , value);
+	return load;
+
+}
+
+
+//strings buff and maps<key,value>
+int put(char buff[]){
+	char key[20];
+	char value[256];
+	bzero(key,20);
+	bzero(value,256);
+
+
+	int i = 0;
+	while(buff[i] != ','){
+		i++;
+	}	
+	
+	strncpy(key , buff + 1 , i -1);
+	strncpy(value , buff + i + 1 , strlen(buff));
+	string key_str = key;
+	string value_str = value;	
+		
+	map<string, list<string>>::iterator it;
+	it = map_user_to_cart.find(key_str);
+	
+	if(it == map_user_to_cart.end()){
+		list<string> cart;
+		cart.push_back(value_str);
+		
+		map_user_to_cart.insert(pair<string , list<string>>(key_str, cart));
+		cout<<"PUT: creating new cart "<<endl;
+	}else{
+		it->second.push_back(value_str);
+		cout<<"PUT: Cart exists"<<endl;	
+	}
+	//printf("key: %s value: %s \n" , key , value);
+	return 1;
+}
+
+void finalize(char buff[]){
+	
+	char key[20];
+	bzero(key , 20);
+	strncpy(key , buff , strlen(buff));
+	
+	string key_str = key + 1;
+	string temp_load = "";
+	map<string, list<string>>::iterator it;
+	it = map_user_to_cart.find(key_str);
+	if(it != map_user_to_cart.end()){
+		it->second.clear();
+		map_user_to_cart.erase(it);
+	}
+}
 
 //thread function that handles the connection
 void *connection_handler(void *socket)
 {
+	cout<<"Connected Started"<<endl;
 	//cast socket pointer
 	int sock = *(int*)socket;
 	//buffer to receive message
@@ -46,6 +146,8 @@ void *connection_handler(void *socket)
 	bzero(buffer,256);
 	n = read(sock,buffer,255);
 	
+	cout<<"Received message: "<<buffer<<endl;
+		
 	if (n < 0){
 	       	error("ERROR reading from socket");
 	}
@@ -54,19 +156,27 @@ void *connection_handler(void *socket)
 	req =  buffer[0] -'0';	
 	
 		
-	//if service request type is QUERRY	
+	//if service request type is QUERRY [1smith]	
 	if(req == QUERRY){
 	 	node_port = 2000 + query(buffer);
 		printf("Service Request: Querry | Query Value: %s | Node Port: %d \n", buffer +1 , node_port);
+	//param [2smith,soap]
+	}else if(req == PUT){
+		node_port = put(buffer);
+		bzero(buffer,256);
+		sprintf(buffer, "%d", node_port);
+	//[3smith]
+	}else if(req == GET){
+		get(buffer);	
+	//[4smith]
+	}else if(req == FINALIZE){
+		finalize(buffer);	
+		bzero(buffer,256);
+		sprintf(buffer, "%s", "Session finalized");
 	}
 	
 		
-	bzero(buffer,256);
-	sprintf(buffer, "%d", node_port);
-	
-
 	n = write(sock, buffer , strlen(buffer));
-	
 	if (n < 0){
 	       	error("ERROR writing to socket");
 	}
@@ -77,6 +187,7 @@ void *connection_handler(void *socket)
 	
 	close(sock);
 }
+
 
 
 int send_message(int p_number){
@@ -144,7 +255,7 @@ int main(){
 		error("ERROR opening socket");
 	
 	bzero((char *) &serv_addr, sizeof(serv_addr));
-	portno = 3000;
+	portno = 2004;
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = INADDR_ANY;
 	serv_addr.sin_port = htons(portno);
@@ -152,7 +263,7 @@ int main(){
 	if (bind(sockfd, (struct sockaddr *) &serv_addr,
 	      sizeof(serv_addr)) < 0) 
 	      error("ERROR on binding");
-	listen(sockfd,50);
+	listen(sockfd,5);
 	clilen = sizeof(cli_addr);
 	
 	pthread_t thread_id;
@@ -172,5 +283,3 @@ int main(){
 	
 	return 0;
 }
-
-
