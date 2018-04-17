@@ -152,7 +152,7 @@ int main(){
 	if (bind(sockfd, (struct sockaddr *) &serv_addr,
 	      sizeof(serv_addr)) < 0) 
 	      error("ERROR on binding");
-	listen(sockfd,50);
+	listen(sockfd,1000);
 	clilen = sizeof(cli_addr);
 	
 	pthread_t thread_id;

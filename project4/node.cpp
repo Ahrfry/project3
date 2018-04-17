@@ -23,22 +23,28 @@
 #define NUM_NODES 5
 
 
+
 using namespace std;
 
 //map key to values
 static map<string, list<string>> map_user_to_cart;
 
+int verbose = 0;
+
 
 //replicas <por_number , <map<key,list<values>>
 //static map<int , map<string , list<string>> replicas;
-
-#define QUERRY 1
-#define NUM_NODES 5
 
 void error(const char *msg)
 {
     perror(msg);
     exit(1);
+}
+
+void print_str(string str){
+	if(verbose == 1){
+		cout<<str<<endl;
+	}
 }
 
 int query(char buff[]){
@@ -49,6 +55,8 @@ int query(char buff[]){
 
 	return value % NUM_NODES;
 }
+
+
 
 char *get(char buff[]){
 	
@@ -103,10 +111,10 @@ int put(char buff[]){
 		cart.push_back(value_str);
 		
 		map_user_to_cart.insert(pair<string , list<string>>(key_str, cart));
-		cout<<"PUT: creating new cart "<<endl;
+		print_str("PUT: creating new cart ");
 	}else{
 		it->second.push_back(value_str);
-		cout<<"PUT: Cart exists"<<endl;	
+		print_str("PUT: Cart exists");	
 	}
 	//printf("key: %s value: %s \n" , key , value);
 	return 1;
@@ -131,7 +139,7 @@ void finalize(char buff[]){
 //thread function that handles the connection
 void *connection_handler(void *socket)
 {
-	cout<<"Connected Started"<<endl;
+	print_str("Connected Started");
 	//cast socket pointer
 	int sock = *(int*)socket;
 	//buffer to receive message
@@ -146,7 +154,7 @@ void *connection_handler(void *socket)
 	bzero(buffer,256);
 	n = read(sock,buffer,255);
 	
-	cout<<"Received message: "<<buffer<<endl;
+	print_str("Received message: " + string(buffer));
 		
 	if (n < 0){
 	       	error("ERROR reading from socket");
@@ -159,7 +167,6 @@ void *connection_handler(void *socket)
 	//if service request type is QUERRY [1smith]	
 	if(req == QUERRY){
 	 	node_port = 2000 + query(buffer);
-		printf("Service Request: Querry | Query Value: %s | Node Port: %d \n", buffer +1 , node_port);
 	//param [2smith,soap]
 	}else if(req == PUT){
 		node_port = put(buffer);
@@ -240,8 +247,13 @@ int send_message(int p_number){
 
 
 
-int main(){
+int main(int argc , char *argv[]){
 
+
+	if (argc < 2) {
+       		fprintf(stderr,"usage %s port_number\n", argv[0]);
+       		exit(0);
+    	}	
 	
 	int sockfd, client_sock, portno;
 	socklen_t clilen;
@@ -255,7 +267,7 @@ int main(){
 		error("ERROR opening socket");
 	
 	bzero((char *) &serv_addr, sizeof(serv_addr));
-	portno = 2004;
+	portno = atoi(argv[1]) + 2000;
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = INADDR_ANY;
 	serv_addr.sin_port = htons(portno);

@@ -5,7 +5,6 @@
 #include <sys/types.h> 
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <sys/time.h>
 #include <netdb.h> 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -20,7 +19,6 @@
 
 #define CM_PORT 3000
 
-int verbose = 0;
 
 using namespace std;
 
@@ -39,11 +37,6 @@ void error(const char *msg)
     exit(0);
 }
 
-void print_str(string str){
-	if(verbose == 1){
-		cout<<str<<endl;
-	}
-}
 
 void send_message(int port_number , char buffer[]){
 	int sockfd, portno, n;
@@ -72,7 +65,7 @@ void send_message(int port_number , char buffer[]){
 		error("ERROR connecting");	
 	}
 	
-	print_str("Sending: " + string(buffer) + " to port "  + to_string( port_number));	
+	printf("Sending: %s to port %d \n" , buffer , port_number);	
 
 	n = write(sockfd,buffer,strlen(buffer));
 	if (n < 0){ 
@@ -84,7 +77,7 @@ void send_message(int port_number , char buffer[]){
 	if (n < 0){ 
 	 	error("ERROR reading from socket");
 	}
-	print_str("Message received: " + string(buffer));
+	cout<<"Message received: "<<buffer<<endl;
 	close(sockfd);
 }
 
@@ -92,10 +85,10 @@ void init_session(env_t *env){
 	bzero(env->buffer,strlen(env->buffer));
 	env->buffer[0] = '1';
 	strncpy(env->buffer + 1, env->key , strlen(env->key));
-	print_str("Init function sending message to CM: "   + string(env->buffer));
+	printf("Init function sending message to CM: %s \n" , env->buffer);
 	send_message(CM_PORT,env->buffer);
 	
-	print_str("Message received from CM: " + string(env->buffer));
+	printf("Message received from CM: %s\n",env->buffer);
 	env->port_number = atoi(env->buffer);
 }
 
@@ -104,6 +97,7 @@ void put(env_t *env , char key[20] , char value[236]){
 	env->buffer[0] = '2';
 	strncpy(env->buffer + 1 , key , strlen(key));
 	strncpy(env->buffer + strlen(key) + 1, value, strlen(value));
+	cout<<env->buffer<<endl;
 	send_message(env->port_number , env->buffer);
 
 }
@@ -126,39 +120,39 @@ void finalize(env_t *env){
 
 
 void *client_thread(void *args){
-
-}
-
-int main(int argc, char *argv[])
-{
-	if (argc < 2) {
-       		fprintf(stderr,"usage %s client_id\n", argv[0]);
-       		exit(0);
-    	}
-	
-	struct timeval old_time, new_time , diff;	
-	//Set preempted time
-	gettimeofday(&old_time , NULL);
-		
 	env_t *env = (env_t *)malloc(sizeof(env_t));	
 	bzero(env->key , strlen(env->key));
-	strcpy(env->key , argv[1]);
-	init_session(env);
-	for(int i=0; i<30; i++){
+	
+	strcpy(env->key , "smith");
+	for(int i=0; i<100; i++){
+		init_session(env);
 		for(int i=0; i<5; i++){
-			put(env , env->key, ",soap");
+			put(env , "smith" , ",soap");
 		}
-		//sleep(1);
-		get(env , env->key);
+		sleep(1);
+		get(env , "smith");
 		finalize(env);
 	}
+}
 
+int main()
+{
 	
-	gettimeofday(&new_time , NULL);
-	//get per_round time
-	timersub(&new_time, &old_time, &diff);
-	cout<<diff.tv_usec<<endl;
 
+	pthread_t p_arr[5];
+	void *dummy;
+	for(int i=0; i<5; i++){
+		//create 5 threads
+		pthread_t p;
+		if(i%2 == 0){
+			pthread_create(&p, NULL, client_thread, dummy);
+		}
+		p_arr[i] = p;
+	}
+	for(int i=0; i<5; i++){
+		pthread_join(p_arr[i], NULL);
+	}
+		
 	//strcpy(buffer , "2smith,soap");
 	//send_message(buffer , 2004);
 	return 0;
