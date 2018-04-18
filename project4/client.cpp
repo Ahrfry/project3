@@ -144,8 +144,8 @@ int main(int argc, char *argv[])
 	bzero(env->key , strlen(env->key));
 	strcpy(env->key , argv[1]);
 	init_session(env);
-	for(int i=0; i<30; i++){
-		for(int i=0; i<5; i++){
+	for(int i=0; i<5; i++){
+		for(int i=0; i<10; i++){
 			put(env , env->key, ",soap");
 		}
 		//sleep(1);
@@ -157,9 +157,7 @@ int main(int argc, char *argv[])
 	gettimeofday(&new_time , NULL);
 	//get per_round time
 	timersub(&new_time, &old_time, &diff);
-	cout<<diff.tv_usec<<endl;
+	//cout<<diff.tv_usec<<endl;
 
-	//strcpy(buffer , "2smith,soap");
-	//send_message(buffer , 2004);
 	return 0;
 }

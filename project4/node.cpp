@@ -29,11 +29,12 @@ using namespace std;
 //map key to values
 static map<string, list<string>> map_user_to_cart;
 
+
 int verbose = 0;
 
 
 //replicas <por_number , <map<key,list<values>>
-//static map<int , map<string , list<string>> replicas;
+static map<int, map<std::string, list<string>>> reps;
 
 void error(const char *msg)
 {
@@ -197,14 +198,12 @@ void *connection_handler(void *socket)
 
 
 
-int send_message(int p_number){
+int send_message(int p_number , char buffer[]){
 	
 	int sockfd, portno, n;
 	struct sockaddr_in serv_addr;
 	struct hostent *server;
 
-	char buffer[256];
-	
 	portno = p_number;
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	
@@ -226,15 +225,15 @@ int send_message(int p_number){
 		error("ERROR connecting");
 	}
 	
-	bzero(buffer,256);
-	fgets(buffer,255,stdin);
+	//bzero(buffer, strlen(buffer));
+	//fgets(buffer,strlen(buffer),stdin);
 	n = write(sockfd,buffer,strlen(buffer));
 	
 	if (n < 0){ 
 		error("ERROR writing to socket");
 	}
-	bzero(buffer,256);
-	n = read(sockfd,buffer,255);
+	bzero(buffer,strlen(buffer));
+	n = read(sockfd,buffer,strlen(buffer));
 	
 	if (n < 0){ 
 		error("ERROR reading from socket");
@@ -254,7 +253,12 @@ int main(int argc , char *argv[]){
        		fprintf(stderr,"usage %s port_number\n", argv[0]);
        		exit(0);
     	}	
-	
+	char buffer[255];
+	bzero(buffer , strlen(buffer));
+	buffer[0] = '2';
+	send_message(3000 , buffer);
+
+	/*	
 	int sockfd, client_sock, portno;
 	socklen_t clilen;
 	char buffer[256];
@@ -275,7 +279,7 @@ int main(int argc , char *argv[]){
 	if (bind(sockfd, (struct sockaddr *) &serv_addr,
 	      sizeof(serv_addr)) < 0) 
 	      error("ERROR on binding");
-	listen(sockfd,5);
+	listen(sockfd,100);
 	clilen = sizeof(cli_addr);
 	
 	pthread_t thread_id;
@@ -292,6 +296,6 @@ int main(int argc , char *argv[]){
 		
 	}
 	close(sockfd);	
-	
+	*/
 	return 0;
 }
