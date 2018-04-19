@@ -32,6 +32,15 @@ static map<string, list<string>> map_user_to_cart;
 
 int verbose = 0;
 
+typedef struct _node_data_t{
+	int port;
+	int rep1;
+	int rep2;
+}node_data_t;
+
+//global node info
+node_data_t node_data;
+
 
 //replicas <por_number , <map<key,list<values>>
 static map<int, map<std::string, list<string>>> reps;
@@ -227,24 +236,41 @@ int send_message(int p_number , char buffer[]){
 	
 	//bzero(buffer, strlen(buffer));
 	//fgets(buffer,strlen(buffer),stdin);
+	
 	n = write(sockfd,buffer,strlen(buffer));
 	
 	if (n < 0){ 
 		error("ERROR writing to socket");
 	}
-	bzero(buffer,strlen(buffer));
-	n = read(sockfd,buffer,strlen(buffer));
+	
+	//bzero(buffer,strlen(buffer));
+	n = read(sockfd,buffer,255);
+	
 	
 	if (n < 0){ 
 		error("ERROR reading from socket");
 	}
-	printf("%s\n",buffer);
 	close(sockfd);
 
 	return 0;
 }
 
 
+void node_init(){
+	
+	char buffer[255];
+	bzero(buffer , strlen(buffer));
+	int test = node_data.port + 20000;
+	sprintf(buffer, "%d" , test);
+	send_message(3000 , buffer);
+	
+	char temp[5];
+	bzero(temp , 5);
+	strncpy(temp, buffer, 4);
+	node_data.rep1 = atoi(temp);
+	strncpy(temp , buffer + 5 , 4);	
+	node_data.rep2 = atoi(temp);
+}
 
 int main(int argc , char *argv[]){
 
@@ -253,10 +279,13 @@ int main(int argc , char *argv[]){
        		fprintf(stderr,"usage %s port_number\n", argv[0]);
        		exit(0);
     	}	
-	char buffer[255];
-	bzero(buffer , strlen(buffer));
-	buffer[0] = '2';
-	send_message(3000 , buffer);
+	
+	node_data.port = atoi(argv[1]) + 2000;
+	
+	node_init();	
+	
+
+	cout<<node_data.rep1<<" "<<node_data.rep2<<endl;
 
 	/*	
 	int sockfd, client_sock, portno;
@@ -271,7 +300,7 @@ int main(int argc , char *argv[]){
 		error("ERROR opening socket");
 	
 	bzero((char *) &serv_addr, sizeof(serv_addr));
-	portno = atoi(argv[1]) + 2000;
+	portno = node_data.port;
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = INADDR_ANY;
 	serv_addr.sin_port = htons(portno);

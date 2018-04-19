@@ -22,11 +22,11 @@
 
 using namespace std;
 
-static map<int , string> map_nodes_to_replicas;
+
+static map<int, list<string>> map_reps;
 
 //oppress couts 
 int verbose = 1;
-
 
 void error(const char *msg)
 {
@@ -49,11 +49,24 @@ void print_str(string str){
 	}
 }
 
+void get_reps(char buff[]){
+	int port  = atoi(buff + 1);
+	int rep1, rep2;
+	map<int, list<string>>::iterator it;
+	it = map_reps.find(port);
+	//rep1 = it->second[0];
+	bzero(buff , 255);
+	string temp_load = "";
+	for(list<string>::iterator list_it = it->second.begin(); list_it!=it->second.end(); list_it++){
+		temp_load = temp_load + " " + *list_it;
+	}
+
+	strcpy(buff-1 , temp_load.c_str());
+}
 
 //thread function that handles the connection
 void *connection_handler(void *socket)
 {
-	cout<<"received connection from someone" <<endl;
 	//cast socket pointer
 	int sock = *(int*)socket;
 	//buffer to receive message
@@ -79,17 +92,18 @@ void *connection_handler(void *socket)
 	//if service request type is QUERRY	
 	if(req == QUERRY){
 	 	node_port = 2000 + query(buffer);
+		bzero(buffer,256);
+		sprintf(buffer, "%d", node_port);
 		print_str("Service Request: Querry | Query Value: " + string(buffer + 1) + " | Node Port: " + to_string(node_port));
 	}else if(req == REPLICA){
-		print_str("Received requests for Replica");	
+		//first char is the command
+		get_reps(buffer);
 	}
 	
-		
-	bzero(buffer,256);
-	sprintf(buffer, "%d", node_port);
 	
-
-	n = write(sock, buffer , strlen(buffer));
+	
+	//print_str("Received requests for Replica from " + string(buff));	
+	n = write(sock, buffer , 255);
 	
 	if (n < 0){
 	       	error("ERROR writing to socket");
@@ -152,9 +166,40 @@ int send_message(int p_number){
 }
 
 
+//initialize mapping of replicas
+void init_reps(){
+	
+	list<string> port1;
+	port1.push_back("2002");
+	port1.push_back("2003");
+
+	/*	
+	list<string> port2;
+	port2.push_back("2003");
+	port2.push_back(2004);
+
+	list<string> port3;
+	port3.push_back("2004");
+	port3.push_back("2005");
+	
+	list<string> port4;
+	port4.push_back("2005");
+	port4.push_back("2001");
+	
+	list<string> port5;
+	port5.push_back("2001");
+	port5.push_back("2002");
+	*/
+	map_reps.insert(pair<int , list<string>>(2001, port1));
+	//map_reps.insert(pair<int , list<string>>(2002, port2));
+	//map_reps.insert(pair<int , list<string>>(2003, port3));
+	//map_reps.insert(pair<int , list<string>>(2004, port4));
+	//map_reps.insert(pair<int , list<string>>(2005, port5));
+}
 
 int main(){
 
+	init_reps();	
 	
 	int sockfd, client_sock, portno;
 	socklen_t clilen;
