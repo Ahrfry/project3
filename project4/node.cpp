@@ -20,6 +20,8 @@
 #define PUT 2
 #define GET 3
 #define FINALIZE 4
+#define SAVE_REPS 5
+
 #define NUM_NODES 5
 
 
@@ -30,7 +32,7 @@ using namespace std;
 static map<string, list<string>> map_user_to_cart;
 
 
-int verbose = 0;
+int verbose = 1;
 
 typedef struct _node_data_t{
 	int port;
@@ -43,7 +45,7 @@ node_data_t node_data;
 
 
 //replicas <por_number , <map<key,list<values>>
-static map<int, map<std::string, list<string>>> reps;
+static map<string, map<std::string, list<string>>> reps;
 
 void error(const char *msg)
 {
@@ -96,7 +98,7 @@ char *get(char buff[]){
 
 
 //strings buff and maps<key,value>
-int put(char buff[]){
+int put(char buff[] , map<string, list<string>> &map_user_to_cart){
 	char key[20];
 	char value[256];
 	bzero(key,20);
@@ -146,6 +148,55 @@ void finalize(char buff[]){
 	}
 }
 
+int save_to_reps(char buffer[]){
+	int saved = -1;
+	string key="" , value = "", port="";
+
+	int flag = 0;
+	int i = 1 , j = 0;
+	while(buffer[i] != '.'){
+		if(buffer[i] == ','){
+			flag++;
+			j=0;
+		}
+		if(flag == 0){
+			port.push_back(buffer[i]);
+		}else if(flag == 1 && buffer[i] != ','){
+			key.push_back(buffer[i]);
+		}else if(buffer[i] != ','){
+			value.push_back(buffer[i]);
+		}
+		i++;
+	}
+
+	
+	//cout<<"Came here indeed "<<value<<" "<<key<<" "<<port<<endl;
+	map<string, map<string , list<string>>>::iterator it;
+	it = reps.find(port);
+	
+	if(it == reps.end()){
+		list<string> cart;
+		cart.push_back(value);
+		map<string , list<string>> map_cart;	
+		map_cart.insert(pair<string , list<string>>(key, cart));
+		reps.insert(pair<string , map<string , list<string>>>(port , map_cart));
+		print_str("PUT: creating new rep ");
+		saved = 1;
+	}else{
+		string temp = key + "," + value;
+		char test[255];
+		bzero(test , 255);
+		strcpy(test , temp.c_str());
+		put(test , it->second);		
+		print_str("PUT REP: Rep exists");
+		saved = 1;		
+	}
+	
+	return saved;
+
+}
+
+
 //thread function that handles the connection
 void *connection_handler(void *socket)
 {
@@ -179,7 +230,7 @@ void *connection_handler(void *socket)
 	 	node_port = 2000 + query(buffer);
 	//param [2smith,soap]
 	}else if(req == PUT){
-		node_port = put(buffer);
+		node_port = put(buffer , map_user_to_cart);
 		bzero(buffer,256);
 		sprintf(buffer, "%d", node_port);
 	//[3smith]
@@ -190,6 +241,9 @@ void *connection_handler(void *socket)
 		finalize(buffer);	
 		bzero(buffer,256);
 		sprintf(buffer, "%s", "Session finalized");
+	}else if(req == SAVE_REPS){
+		save_to_reps(buffer);	
+	
 	}
 	
 		
@@ -285,9 +339,6 @@ int main(int argc , char *argv[]){
 	node_init();	
 	
 
-	cout<<node_data.rep1<<" "<<node_data.rep2<<endl;
-
-	/*	
 	int sockfd, client_sock, portno;
 	socklen_t clilen;
 	char buffer[256];
@@ -325,6 +376,6 @@ int main(int argc , char *argv[]){
 		
 	}
 	close(sockfd);	
-	*/
+	
 	return 0;
 }
