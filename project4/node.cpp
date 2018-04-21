@@ -21,7 +21,7 @@
 #define GET 3
 #define FINALIZE 4
 #define SAVE_REPS 5
-
+#define GET_REP 6
 #define NUM_NODES 5
 
 
@@ -49,8 +49,8 @@ static map<string, map<std::string, list<string>>> reps;
 
 void error(const char *msg)
 {
-    perror(msg);
-    exit(1);
+	perror(msg);
+	exit(1);
 }
 
 void print_str(string str){
@@ -70,22 +70,23 @@ int query(char buff[]){
 
 
 
-char *get(char buff[]){
+char *get(char buff[] , map<string, list<string>> &temp_map){
 	
 	char key[20];
 	bzero(key , 20);
-	strncpy(key , buff , strlen(buff));
-	
+	strncpy(key , buff , strlen(buff) - 1);
 	string key_str = key + 1;
 	string temp_load = "";
 	int flag = 0;
 	char *load;	
 	map<string, list<string>>::iterator it;
-	it = map_user_to_cart.find(key_str);
-	if(it != map_user_to_cart.end()){
+	it = temp_map.find(key_str);
+	cout<<"came here "<<key_str.size()<<endl;
+	if(it != temp_map.end()){
 		flag = 1;
 		for(list<string>::iterator list_it = it->second.begin(); list_it!=it->second.end(); list_it++){
-			temp_load = temp_load + " " + *list_it;
+			temp_load = temp_load + "," + *list_it;
+			//cout<<"buff "<<temp_load<<endl;	
 		}
 	}
 	bzero(buff , strlen(buff));
@@ -95,6 +96,8 @@ char *get(char buff[]){
 	return load;
 
 }
+
+
 
 
 //strings buff and maps<key,value>
@@ -123,6 +126,7 @@ int put(char buff[] , map<string, list<string>> &map_user_to_cart){
 		cart.push_back(value_str);
 		
 		map_user_to_cart.insert(pair<string , list<string>>(key_str, cart));
+		cout<<"key from put: "<<key_str<<endl;
 		print_str("PUT: creating new cart ");
 	}else{
 		it->second.push_back(value_str);
@@ -170,7 +174,7 @@ int save_to_reps(char buffer[]){
 	}
 
 	
-	//cout<<"Came here indeed "<<value<<" "<<key<<" "<<port<<endl;
+	//cout<<"Save To Reps: "<<value<<" "<<key<<" "<<port<<endl;
 	map<string, map<string , list<string>>>::iterator it;
 	it = reps.find(port);
 	
@@ -183,10 +187,12 @@ int save_to_reps(char buffer[]){
 		print_str("PUT: creating new rep ");
 		saved = 1;
 	}else{
-		string temp = key + "," + value;
+		//put expects the first char of the string to be a command... so just adding 1 as dummy
+		string temp = "1" + key + "," + value;
 		char test[255];
 		bzero(test , 255);
 		strcpy(test , temp.c_str());
+		//cout<<"when reps exist: -->key "<<test<<endl;
 		put(test , it->second);		
 		print_str("PUT REP: Rep exists");
 		saved = 1;		
@@ -196,6 +202,30 @@ int save_to_reps(char buffer[]){
 
 }
 
+void get_rep(char buffer[]){
+	char key[255];
+	bzero(key ,255);
+	strncpy(key , buffer , strlen(buffer) - 1);
+	string  port= key + 1;
+	string temp_load = "";
+	int flag = 0;
+	map<string, map<string , list<string>>>::iterator rep_it;
+	rep_it = reps.find(port);
+	
+	for(map<string , list<string>>::iterator cart_it =  rep_it->second.begin(); cart_it != rep_it->second.end(); cart_it++ ){
+		temp_load = temp_load + cart_it->first;	
+		for(list<string>::iterator list_it = cart_it->second.begin(); list_it!=cart_it->second.end(); list_it++){
+			temp_load = temp_load + "," + *list_it;
+			//cout<<"buff "<<temp_load<<endl;	
+		}
+
+		temp_load = temp_load + ".";
+	}
+	bzero(buffer , 255);
+	strcpy(buffer ,temp_load.c_str());
+	
+
+}
 
 //thread function that handles the connection
 void *connection_handler(void *socket)
@@ -235,7 +265,7 @@ void *connection_handler(void *socket)
 		sprintf(buffer, "%d", node_port);
 	//[3smith]
 	}else if(req == GET){
-		get(buffer);	
+		get(buffer , map_user_to_cart);	
 	//[4smith]
 	}else if(req == FINALIZE){
 		finalize(buffer);	
@@ -244,9 +274,10 @@ void *connection_handler(void *socket)
 	}else if(req == SAVE_REPS){
 		save_to_reps(buffer);	
 	
+	}else if(req == GET_REP){
+		get_rep(buffer);
 	}
 	
-		
 	n = write(sock, buffer , strlen(buffer));
 	if (n < 0){
 	       	error("ERROR writing to socket");
@@ -338,6 +369,7 @@ int main(int argc , char *argv[]){
 	
 	node_init();	
 	
+	cout<<node_data.rep1<<" "<<node_data.rep2<<endl;	
 
 	int sockfd, client_sock, portno;
 	socklen_t clilen;

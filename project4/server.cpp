@@ -30,8 +30,8 @@ int verbose = 1;
 
 void error(const char *msg)
 {
-    perror(msg);
-    exit(1);
+	perror(msg);
+	exit(1);
 }
 
 int query(char buff[]){
@@ -173,10 +173,9 @@ void init_reps(){
 	port1.push_back("2002");
 	port1.push_back("2003");
 
-	/*	
 	list<string> port2;
 	port2.push_back("2003");
-	port2.push_back(2004);
+	port2.push_back("2004");
 
 	list<string> port3;
 	port3.push_back("2004");
@@ -189,12 +188,11 @@ void init_reps(){
 	list<string> port5;
 	port5.push_back("2001");
 	port5.push_back("2002");
-	*/
 	map_reps.insert(pair<int , list<string>>(2001, port1));
-	//map_reps.insert(pair<int , list<string>>(2002, port2));
-	//map_reps.insert(pair<int , list<string>>(2003, port3));
-	//map_reps.insert(pair<int , list<string>>(2004, port4));
-	//map_reps.insert(pair<int , list<string>>(2005, port5));
+	map_reps.insert(pair<int , list<string>>(2002, port2));
+	map_reps.insert(pair<int , list<string>>(2003, port3));
+	map_reps.insert(pair<int , list<string>>(2004, port4));
+	map_reps.insert(pair<int , list<string>>(2005, port5));
 }
 
 int main(){
