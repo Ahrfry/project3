@@ -17,13 +17,17 @@
 
 #define QUERRY 1
 #define REPLICA 2
+#define NODE_DOWN 3
 #define NUM_NODES 5
 
 
 using namespace std;
 
 
-static map<int, list<string>> map_reps;
+//static map<string , list<string>> map_reps;
+
+static map<string, string> map_reps;
+static map<string, string> router;
 
 //oppress couts 
 int verbose = 1;
@@ -52,16 +56,16 @@ void print_str(string str){
 void get_reps(char buff[]){
 	int port  = atoi(buff + 1);
 	int rep1, rep2;
-	map<int, list<string>>::iterator it;
-	it = map_reps.find(port);
+	//map<string, list<string>>::iterator it;
+	//it = map_reps.find(to_string(port));
 	//rep1 = it->second[0];
 	bzero(buff , 255);
 	string temp_load = "";
-	for(list<string>::iterator list_it = it->second.begin(); list_it!=it->second.end(); list_it++){
-		temp_load = temp_load + " " + *list_it;
-	}
+	//for(list<string>::iterator list_it = it->second.begin(); list_it!=it->second.end(); list_it++){
+		//temp_load = temp_load + " " + *list_it;
+	//}
 
-	strcpy(buff-1 , temp_load.c_str());
+	strcpy(buff, map_reps[to_string(port)].c_str());
 }
 
 //thread function that handles the connection
@@ -93,11 +97,25 @@ void *connection_handler(void *socket)
 	if(req == QUERRY){
 	 	node_port = 2000 + query(buffer);
 		bzero(buffer,256);
-		sprintf(buffer, "%d", node_port);
-		print_str("Service Request: Querry | Query Value: " + string(buffer + 1) + " | Node Port: " + to_string(node_port));
+		strcpy(buffer, router[to_string(node_port)].c_str());
+		print_str("Service Request: Querry | Query Value: " + string(buffer) + " | Node Port: " + to_string(node_port));
 	}else if(req == REPLICA){
 		//first char is the command
 		get_reps(buffer);
+	}else if (req == NODE_DOWN){
+		cout<<"Node down :" <<buffer<<endl;
+		char g_node[20];
+		char b_node[20];
+		bzero(b_node , 20);
+		bzero(g_node , 20);
+		strncpy(g_node , buffer + 1 , 4);
+		strncpy(b_node , buffer + 6 , 4);
+		int new_route = stoi(string(b_node)) + 1 ;
+		router[string(b_node)] = to_string(new_route);
+		map_reps[string(g_node)] = to_string(new_route);
+		bzero(buffer , 255);
+		strcpy(buffer , to_string(new_route).c_str());
+		cout<<"Node keys "<<router[string(b_node)] <<endl;
 	}
 	
 	
@@ -168,31 +186,44 @@ int send_message(int p_number){
 
 //initialize mapping of replicas
 void init_reps(){
-	
+	/*
 	list<string> port1;
 	port1.push_back("2002");
-	port1.push_back("2003");
+	//port1.push_back("2003");
 
 	list<string> port2;
 	port2.push_back("2003");
-	port2.push_back("2004");
+	//port2.push_back("2004");
 
 	list<string> port3;
 	port3.push_back("2004");
-	port3.push_back("2005");
+	//port3.push_back("2005");
 	
 	list<string> port4;
 	port4.push_back("2005");
-	port4.push_back("2001");
+	//port4.push_back("2001");
 	
 	list<string> port5;
 	port5.push_back("2001");
-	port5.push_back("2002");
-	map_reps.insert(pair<int , list<string>>(2001, port1));
-	map_reps.insert(pair<int , list<string>>(2002, port2));
-	map_reps.insert(pair<int , list<string>>(2003, port3));
-	map_reps.insert(pair<int , list<string>>(2004, port4));
-	map_reps.insert(pair<int , list<string>>(2005, port5));
+	//port5.push_back("2002");
+	
+	map_reps.insert(pair<string , list<string>>("2001", port1));
+	map_reps.insert(pair<string , list<string>>("2002", port2));
+	map_reps.insert(pair<string , list<string>>("2003", port3));
+	map_reps.insert(pair<string , list<string>>("2004", port4));
+	map_reps.insert(pair<string , list<string>>("2005", port5));
+	*/
+	map_reps.insert(pair<string , string>("2001", "2002"));
+	map_reps.insert(pair<string , string>("2002", "2003"));
+	map_reps.insert(pair<string , string>("2003", "2004"));
+	map_reps.insert(pair<string , string>("2004", "2005"));
+	map_reps.insert(pair<string , string>("2005", "2001"));
+	
+	router.insert(pair<string , string>("2001", "2001"));
+	router.insert(pair<string , string>("2002", "2002"));
+	router.insert(pair<string , string>("2003", "2003"));
+	router.insert(pair<string , string>("2004", "2004"));
+	router.insert(pair<string , string>("2005", "2005"));
 }
 
 int main(){
