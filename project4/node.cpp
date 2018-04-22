@@ -22,6 +22,7 @@
 #define FINALIZE 4
 #define SAVE_REPS 5
 #define GET_REP 6
+#define RECEIVE_REP 7
 #define NUM_NODES 5
 
 
@@ -68,6 +69,48 @@ int query(char buff[]){
 	}
 
 	return value % NUM_NODES;
+}
+
+
+void parse_rep(char buffer[]){
+	print_str("Received replica, now parsing!");
+	char port[20];
+	string key , value;
+
+	bzero(port , 20);
+	strncpy(port, buffer + 1 , 4);
+	
+	map<string, list<string>> map_rep;
+	int i = 5;
+	int flag = 0;
+	while(buffer[i] != ';'){
+		key = "";
+		list<string> cart;
+		
+
+		while(buffer[i] != '.'){
+			if(buffer[i] == ','){
+				flag++;
+				
+				cart.push_back(value);
+				//print_str("From Parse_REP Key " + key +" Value " + value);
+			}
+			if(flag == 0){
+				key.push_back(buffer[i]);
+			}else if(flag == 1 && buffer[i] != ','){
+				value.push_back(buffer[i]);
+			}
+			i++;
+		}
+		
+		map_rep.insert(pair<string , list<string>>(string(key), cart));
+		
+		flag = 0;
+		value = "";
+		i++;
+		//cout<<buffer[i++]<<endl;
+	}
+	reps.insert(pair<string , map<string , list<string>>>(string(port) , map_rep));
 }
 
 
@@ -220,9 +263,18 @@ int put(char buff[] , map<string, list<string>> &map_user_to_cart){
 			bzero(buff , 255);
 			strcpy(buff ,  cm_message.c_str());
 			send_message(3000 , buff);
-			cout<<"from put inside propagate: "<<buff<<endl;
+			cout<<"Replica node is down. Message CM and request new node"<<endl;
+			cout<<"New node provided by CM: "<<buff<<endl;
 			node_data.rep1 = stoi(string(buff));
-			//get_rep(buff, it);
+			bzero(buff , 255);
+			map<string, map<string , list<string>>>::iterator rep_it;
+			rep_it = reps.find(to_string(node_data.port));
+			buff[0] = '7';
+			strcpy(buff + 1 , to_string(node_data.port).c_str());
+			get_rep(buff + 5 , rep_it);
+			buff[strlen(buff)] = ';';
+			cout<<"From Put - dump replica and send it to new node: "<<buff<<endl;
+			send_message(node_data.rep1 , buff);
 		}
 	}
 
@@ -308,7 +360,7 @@ int save_to_reps(char buffer[] , int prop){
 //thread function that handles the connection
 void *connection_handler(void *socket)
 {
-	print_str("Connected Started");
+	print_str("Connection Started");
 	//cast socket pointer
 	int sock = *(int*)socket;
 	//buffer to receive message
@@ -346,7 +398,6 @@ void *connection_handler(void *socket)
 			temp.append(".");
 			bzero(buffer,256);
 			strcpy(buffer ,  temp.c_str());
-			cout<<"FUCK  "<<buffer<<endl;
 			save_to_reps(buffer , 1);
 		}else{
 			node_port = put(buffer , rep_it->second);
@@ -373,9 +424,13 @@ void *connection_handler(void *socket)
 		string  port= key + 1;
 		int flag = 0;
 		map<string, map<string , list<string>>>::iterator rep_it;
-		cout<<"From get_rep "<<port<<endl;
+		cout<<"From get_rep - "<<port<<endl;
 		rep_it = reps.find(port);
 		get_rep(buffer , rep_it);
+	//[72001smith,soap,test.josh,soap,test.;
+	}else if(req == RECEIVE_REP){
+		cout<<"From RECEIVE_REP: "<<buffer<<endl;
+		parse_rep(buffer);
 	}
 	
 	n = write(sock, buffer , strlen(buffer));
@@ -421,7 +476,7 @@ int main(int argc , char *argv[]){
 	
 	node_init();	
 	
-	cout<<node_data.rep1<<" "<<node_data.rep2<<endl;	
+	print_str("Node connected. Sending replicas to: " + to_string(node_data.rep1));	
 
 	int sockfd, client_sock, portno;
 	socklen_t clilen;

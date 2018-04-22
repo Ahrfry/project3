@@ -144,9 +144,9 @@ int main(int argc, char *argv[])
 	bzero(env->key , strlen(env->key));
 	strcpy(env->key , argv[1]);
 	init_session(env);
-	for(int i=0; i<5; i++){
-		for(int i=0; i<10; i++){
-			put(env , env->key, ",soap");
+	for(int i=0; i<2; i++){
+		for(int i=0; i<2; i++){
+			put(env , env->key, ",soapp");
 		}
 		//sleep(1);
 		get(env , env->key);

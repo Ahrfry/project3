@@ -103,7 +103,7 @@ void *connection_handler(void *socket)
 		//first char is the command
 		get_reps(buffer);
 	}else if (req == NODE_DOWN){
-		cout<<"Node down :" <<buffer<<endl;
+		cout<<"Node down! Remapping and re-routing: " <<buffer<<endl;
 		char g_node[20];
 		char b_node[20];
 		bzero(b_node , 20);
@@ -115,7 +115,7 @@ void *connection_handler(void *socket)
 		map_reps[string(g_node)] = to_string(new_route);
 		bzero(buffer , 255);
 		strcpy(buffer , to_string(new_route).c_str());
-		cout<<"Node keys "<<router[string(b_node)] <<endl;
+		cout<<"Node providing new node replica: "<<router[string(b_node)] <<endl;
 	}
 	
 	
@@ -224,6 +224,7 @@ void init_reps(){
 	router.insert(pair<string , string>("2003", "2003"));
 	router.insert(pair<string , string>("2004", "2004"));
 	router.insert(pair<string , string>("2005", "2005"));
+	router.insert(pair<string , string>("2000", "2005"));
 }
 
 int main(){
