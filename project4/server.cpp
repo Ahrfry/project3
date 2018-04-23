@@ -18,6 +18,7 @@
 #define QUERRY 1
 #define REPLICA 2
 #define NODE_DOWN 3
+#define JOIN 4
 #define NUM_NODES 5
 
 
@@ -68,73 +69,6 @@ void get_reps(char buff[]){
 	strcpy(buff, map_reps[to_string(port)].c_str());
 }
 
-//thread function that handles the connection
-void *connection_handler(void *socket)
-{
-	//cast socket pointer
-	int sock = *(int*)socket;
-	//buffer to receive message
-	char buffer[256];
-	//test read , write and port number
-	int n , node_port = -1;
-	
-	if (sock < 0){ 
-		  error("ERROR on accept");
-	}
-	
-	bzero(buffer,256);
-	n = read(sock,buffer,255);
-	
-	if (n < 0){
-	       	error("ERROR reading from socket");
-	}
-	
-	int req;
-	req =  buffer[0] -'0';	
-	
-		
-	//if service request type is QUERRY	
-	if(req == QUERRY){
-	 	node_port = 2000 + query(buffer);
-		bzero(buffer,256);
-		strcpy(buffer, router[to_string(node_port)].c_str());
-		print_str("Service Request: Querry | Query Value: " + string(buffer) + " | Node Port: " + to_string(node_port));
-	}else if(req == REPLICA){
-		//first char is the command
-		get_reps(buffer);
-	}else if (req == NODE_DOWN){
-		cout<<"Node down! Remapping and re-routing: " <<buffer<<endl;
-		char g_node[20];
-		char b_node[20];
-		bzero(b_node , 20);
-		bzero(g_node , 20);
-		strncpy(g_node , buffer + 1 , 4);
-		strncpy(b_node , buffer + 6 , 4);
-		int new_route = stoi(string(b_node)) + 1 ;
-		router[string(b_node)] = to_string(new_route);
-		map_reps[string(g_node)] = to_string(new_route);
-		bzero(buffer , 255);
-		strcpy(buffer , to_string(new_route).c_str());
-		cout<<"Node providing new node replica: "<<router[string(b_node)] <<endl;
-	}
-	
-	
-	
-	//print_str("Received requests for Replica from " + string(buff));	
-	n = write(sock, buffer , 255);
-	
-	if (n < 0){
-	       	error("ERROR writing to socket");
-	}
-	
-	
-	//send_message(2001);	
-		
-	
-	close(sock);
-}
-
-
 int send_message(int p_number){
 	
 	int sockfd, portno, n;
@@ -182,6 +116,90 @@ int send_message(int p_number){
 
 	return 0;
 }
+
+
+
+//thread function that handles the connection
+void *connection_handler(void *socket)
+{
+	//cast socket pointer
+	int sock = *(int*)socket;
+	//buffer to receive message
+	char buffer[256];
+	//test read , write and port number
+	int n , node_port = -1;
+	
+	if (sock < 0){ 
+		  error("ERROR on accept");
+	}
+	
+	bzero(buffer,256);
+	n = read(sock,buffer,255);
+	
+	if (n < 0){
+	       	error("ERROR reading from socket");
+	}
+	
+		
+	int req;
+	req =  buffer[0] -'0';	
+	
+		
+	//if service request type is QUERRY	
+	if(req == QUERRY){
+	 	node_port = 2000 + query(buffer);
+		bzero(buffer,256);
+		strcpy(buffer, router[to_string(node_port)].c_str());
+		print_str("Service Request: Querry | Query Value: " + string(buffer) + " | Node Port: " + to_string(node_port));
+	}else if(req == REPLICA){
+		//first char is the command
+		get_reps(buffer);
+	}else if (req == NODE_DOWN){
+		cout<<"Node down! Remapping and re-routing: " <<buffer<<endl;
+		char g_node[20];
+		char b_node[20];
+		bzero(b_node , 20);
+		bzero(g_node , 20);
+		strncpy(g_node , buffer + 1 , 4);
+		strncpy(b_node , buffer + 6 , 4);
+		int new_route = stoi(string(b_node)) + 1 ;
+		router[string(b_node)] = to_string(new_route);
+		map_reps[string(g_node)] = to_string(new_route);
+		bzero(buffer , 255);
+		strcpy(buffer , to_string(new_route).c_str());
+		cout<<"Node providing new node replica: "<<router[string(b_node)] <<endl;
+	//[42001]
+	}else if(req == JOIN){
+		char port[20];
+		bzero(port , 20);
+		strncpy(port , buffer + 1 , 4);
+		if(string(port).compare(router[string(port)]) != 0){
+			int n_port =  stoi(string(port)) - 1;
+			buffer[0] = '3';	
+			router[string(port)] = string(port);
+			map_reps[string(port)] = to_string(n_port + 2);
+			//cout<<"from join "<<n_port<<" "<< router[string(port)]<<" " <<buffer <<endl;
+		}else{
+			buffer[0] = '0';
+		}	
+	}
+	
+	
+	
+	//print_str("Received requests for Replica from " + string(buff));	
+	n = write(sock, buffer , 255);
+	
+	if (n < 0){
+	       	error("ERROR writing to socket");
+	}
+	
+	
+	//send_message(2001);	
+		
+	
+	close(sock);
+}
+
 
 
 //initialize mapping of replicas

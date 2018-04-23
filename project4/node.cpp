@@ -23,6 +23,7 @@
 #define SAVE_REPS 5
 #define GET_REP 6
 #define RECEIVE_REP 7
+#define SET_REP 8
 #define NUM_NODES 5
 
 
@@ -356,6 +357,23 @@ int save_to_reps(char buffer[] , int prop){
 
 }
 
+void node_init(){
+	
+	char buffer[255];
+	bzero(buffer , strlen(buffer));
+	//[22001]
+	int test = node_data.port + 20000;
+	
+	sprintf(buffer, "%d" , test);
+	send_message(3000 , buffer);
+	
+	char temp[5];
+	bzero(temp , 5);
+	strncpy(temp, buffer, 4);
+	node_data.rep1 = atoi(temp);
+	strncpy(temp , buffer + 5 , 4);	
+	node_data.rep2 = atoi(temp);
+}
 
 //thread function that handles the connection
 void *connection_handler(void *socket)
@@ -384,7 +402,7 @@ void *connection_handler(void *socket)
 	int req;
 	req =  buffer[0] -'0';	
 	
-		
+
 	//if service request type is QUERRY [1smith]	
 	if(req == QUERRY){
 	 	node_port = 2000 + query(buffer);
@@ -420,17 +438,28 @@ void *connection_handler(void *socket)
 	}else if(req == GET_REP){
 		char key[255];
 		bzero(key ,255);
-		strncpy(key , buffer , strlen(buffer) - 1);
-		string  port= key + 1;
+		strncpy(key , buffer + 1 , 4);
+		string  port= key;
 		int flag = 0;
 		map<string, map<string , list<string>>>::iterator rep_it;
 		cout<<"From get_rep - "<<port<<endl;
 		rep_it = reps.find(port);
-		get_rep(buffer , rep_it);
+		if(rep_it != reps.end()){
+			get_rep(buffer , rep_it);
+			//buffer[strlen(buffer)] = ';';
+		}else{
+			buffer[0] = '3';
+		}
 	//[72001smith,soap,test.josh,soap,test.;
 	}else if(req == RECEIVE_REP){
 		cout<<"From RECEIVE_REP: "<<buffer<<endl;
 		parse_rep(buffer);
+	//[8]
+	}else if(req == SET_REP){
+		//sleep(2);
+		
+		node_data.rep1 = node_data.port + 1;
+		print_str("Replica set to: " + to_string(node_data.rep1));
 	}
 	
 	n = write(sock, buffer , strlen(buffer));
@@ -445,23 +474,50 @@ void *connection_handler(void *socket)
 	close(sock);
 }
 
-
-
-
-void node_init(){
+void node_join(){
 	
 	char buffer[255];
 	bzero(buffer , strlen(buffer));
-	int test = node_data.port + 20000;
+	//[42001]
+	int test = node_data.port + 40000;
+	
 	sprintf(buffer, "%d" , test);
 	send_message(3000 , buffer);
+	if(buffer[0] == '3'){
+		string buff = "6" + to_string(node_data.port - 1);
+		bzero(buffer , 255);
+		strcpy(buffer , buff.c_str());
+		send_message(node_data.port - 1 , buffer);
+		buff ="7" + to_string(node_data.port - 1) + string(buffer) + ";";
+		cout<<"Joining system: "<<buffer<<endl;
+		//buffer not empty
+		if(buffer[0] != '3'){
+			
+			strcpy(buffer , buff.c_str());
+			parse_rep(buffer);
+		}else{
+			cout<<"List was emtpy "<<endl;
+		}
+		buffer[0] = '8';
+		send_message(node_data.port - 1 , buffer);
+		
+		buff = "6" + to_string(node_data.port);
+		bzero(buffer , 255);
+		strcpy(buffer , buff.c_str());
+		cout<<"sending to 2002 " <<buffer<<endl;
+		send_message(node_data.port + 1 , buffer);
+		buff ="7" + to_string(node_data.port) + string(buffer) + ";";
+		
+		
+		if(buffer[0] != '3'){
+			
+			strcpy(buffer , buff.c_str());
+			parse_rep(buffer);
+		}else{
+			cout<<"List was emtpy "<<endl;
+		}	
 	
-	char temp[5];
-	bzero(temp , 5);
-	strncpy(temp, buffer, 4);
-	node_data.rep1 = atoi(temp);
-	strncpy(temp , buffer + 5 , 4);	
-	node_data.rep2 = atoi(temp);
+	}
 }
 
 int main(int argc , char *argv[]){
@@ -473,9 +529,8 @@ int main(int argc , char *argv[]){
     	}	
 	
 	node_data.port = atoi(argv[1]) + 2000;
-	
+	node_join();
 	node_init();	
-	
 	print_str("Node connected. Sending replicas to: " + to_string(node_data.rep1));	
 
 	int sockfd, client_sock, portno;
